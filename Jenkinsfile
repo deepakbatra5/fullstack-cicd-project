@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    }
+
     stages {
 
         stage('Checkout') {
@@ -9,39 +14,45 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Terraform Init') {
             steps {
-                powershell """
-                    Write-Host 'Building project...'
-                    # Example for NodeJS
-                    npm install
+                bat """
+                    terraform init
                 """
             }
         }
 
-        stage('Test') {
+        stage('Terraform Validate') {
             steps {
-                powershell """
-                    Write-Host 'Running tests...'
-                    # Example
-                    npm test
+                bat """
+                    terraform validate
                 """
             }
         }
 
-        stage('Deploy') {
+        stage('Terraform Plan') {
             steps {
-                powershell """
-                    Write-Host 'Starting Application...'
-                    # Example Local Deployment
-                    node app.js
+                bat """
+                    terraform plan -out=tfplan
+                """
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                bat """
+                    terraform apply -auto-approve tfplan
                 """
             }
         }
     }
 
     post {
-        success { echo 'Pipeline Completed Successfully' }
-        failure { echo 'Pipeline Failed' }
+        success {
+            echo "Terraform CICD Pipeline completed successfully!"
+        }
+        failure {
+            echo "Pipeline failed!"
+        }
     }
 }
