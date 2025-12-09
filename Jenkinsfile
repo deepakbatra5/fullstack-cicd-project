@@ -89,18 +89,7 @@ pipeline {
 
         /* ------------------ ANSIBLE / DEPLOYMENT ------------------ */
 
-        stage('Prepare SSH Key for WSL') {
-            steps {
-                echo 'Preparing SSH key for Ansible inside WSL...'
-
-                bat '''
-                    mkdir C:\\jenkins-ssh-keys || exit 0
-                    copy C:\\Users\\Deepa\\.ssh\\fullstack-cicd.pem C:\\jenkins-ssh-keys\\ec2-key.pem
-                    wsl mkdir -p /tmp/jenkins-ssh
-                    wsl cp /mnt/c/jenkins-ssh-keys/ec2-key.pem /tmp/jenkins-ssh/ec2-key.pem
-                    wsl chmod 400 /tmp/jenkins-ssh/ec2-key.pem
-                '''
-            }
+        
         }
 
         stage('Generate Ansible Inventory') {
@@ -109,7 +98,7 @@ pipeline {
 
                 script {
                     def inventory = """[webservers]
-${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=/tmp/jenkins-ssh/ec2-key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/fullstack-cicd.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 """
                     writeFile file: 'ansible/inventory.ini', text: inventory
                 }
@@ -171,3 +160,4 @@ ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=/tmp/jenkins-ssh/
         }
     }
 }
+
