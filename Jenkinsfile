@@ -1,16 +1,15 @@
 pipeline {
     agent any
 
-    environment {
-        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-    }
-
     stages {
 
-        stage('Checkout') {
+        stage('SSH Test to EC2') {
             steps {
-                checkout scm
+                sshagent(['ec2-ssh']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ubuntu@18.207.136.4 'echo Connected Successfully'
+                    """
+                }
             }
         }
 
@@ -45,11 +44,26 @@ pipeline {
                 """
             }
         }
-    }
+
+        stage('Deploy App to EC2 (Docker)') {
+            steps {
+                sshagent(['ec2-ssh']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ubuntu@18.207.136.4 '
+                            cd /home/ubuntu/fullstack-cicd-project &&
+                            docker-compose pull &&
+                            docker-compose up -d --build
+                        '
+                    """
+                }
+            }
+        }
+
+    }  // <-- END stages
 
     post {
         success {
-            echo "Terraform CICD Pipeline completed successfully!"
+            echo "Terraform + SSH Deployment Pipeline completed successfully!"
         }
         failure {
             echo "Pipeline failed!"

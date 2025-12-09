@@ -38,6 +38,10 @@ docker-login.txt
 *.tfstate
 *.tfstate.*
 crash.log
+.terraform/
+*.tfstate
+*.tfstate.*
+
 
 # Local Terraform directories
 .terraform/
