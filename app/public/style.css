@@ -1,0 +1,37 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+}
+
+.container {
+  background: #111827;
+  padding: 24px 32px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  text-align: center;
+}
+
+h1 {
+  margin-bottom: 16px;
+}
+
+#counter-box {
+  margin: 16px auto;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: #1f2937;
+  display: inline-flex;
+  gap: 10px;
+  font-size: 20px;
+}
+
+.small {
+  font-size: 12px;
+  color: #9ca3af;
+}
