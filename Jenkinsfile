@@ -6,6 +6,7 @@ pipeline {
     }
     
     stages {
+
         stage('Checkout') {
             steps {
                 echo 'Checking out code from GitHub...'
@@ -17,15 +18,16 @@ pipeline {
             steps {
                 echo 'Verifying installed tools...'
                 bat 'terraform --version'
-                // Check Ansible via WSL
                 bat 'wsl ansible --version'
             }
         }
-        
+
+        /* ------------------ TERRAFORM STAGES ------------------ */
+
         stage('Terraform Init') {
             steps {
                 echo 'Initializing Terraform...'
-                dir('terraform') {
+                dir('infra/terraform') {
                     withCredentials([[
                         $class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: 'aws-credentials',
@@ -41,7 +43,7 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 echo 'Planning Terraform changes...'
-                dir('terraform') {
+                dir('infra/terraform') {
                     withCredentials([[
                         $class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: 'aws-credentials',
@@ -57,7 +59,7 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 echo 'Applying Terraform changes...'
-                dir('terraform') {
+                dir('infra/terraform') {
                     withCredentials([[
                         $class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: 'aws-credentials',
@@ -65,9 +67,10 @@ pipeline {
                         secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                     ]]) {
                         bat 'terraform apply -auto-approve tfplan'
+
                         script {
                             env.EC2_IP = bat(
-                                returnStdout: true, 
+                                returnStdout: true,
                                 script: 'terraform output -raw ec2_public_ip'
                             ).trim()
                             echo "EC2 Instance IP: ${env.EC2_IP}"
@@ -83,27 +86,42 @@ pipeline {
                 sleep(time: 90, unit: 'SECONDS')
             }
         }
-        
-        
+
+        /* ------------------ ANSIBLE / DEPLOYMENT ------------------ */
+
+        stage('Prepare SSH Key for WSL') {
+            steps {
+                echo 'Preparing SSH key for Ansible inside WSL...'
+
+                bat '''
+                    mkdir C:\\jenkins-ssh-keys || exit 0
+                    copy C:\\Users\\Deepa\\.ssh\\fullstack-cicd.pem C:\\jenkins-ssh-keys\\ec2-key.pem
+                    wsl mkdir -p /tmp/jenkins-ssh
+                    wsl cp /mnt/c/jenkins-ssh-keys/ec2-key.pem /tmp/jenkins-ssh/ec2-key.pem
+                    wsl chmod 400 /tmp/jenkins-ssh/ec2-key.pem
+                '''
+            }
         }
-        
+
         stage('Generate Ansible Inventory') {
             steps {
                 echo 'Generating Ansible inventory file...'
+
                 script {
-                    // Use WSL path for SSH key
-                    def inventoryContent = """[webservers]
-${env.EC2_IP} ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/fullstack-cicd.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+                    def inventory = """[webservers]
+${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=/tmp/jenkins-ssh/ec2-key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 """
-                    writeFile file: 'ansible/inventory.ini', text: inventoryContent
-                    echo "Inventory created with IP: ${env.EC2_IP}"
+                    writeFile file: 'ansible/inventory.ini', text: inventory
                 }
+
+                echo "Inventory created with IP: ${env.EC2_IP}"
             }
         }
-        
+
         stage('Ansible Deployment') {
             steps {
-                echo 'Deploying application with Ansible via WSL...'
+                echo 'Deploying application to EC2 using Ansible (WSL)...'
+
                 dir('ansible') {
                     bat '''
                         wsl bash -c "cd $(wslpath '%CD%') && ansible-playbook -i inventory.ini playbook.yml"
@@ -111,32 +129,28 @@ ${env.EC2_IP} ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/fullstac
                 }
             }
         }
-        
+
         stage('Verification') {
             steps {
-                echo 'Verifying deployment...'
-                script {
-                    echo "========================================="
-                    echo "Application deployed successfully!"
-                    echo "Access your application at: http://${env.EC2_IP}"
-                    echo "========================================="
-                }
+                echo "Application deployed successfully!"
+                echo "URL: http://${env.EC2_IP}"
             }
         }
-    }
-    
+
+    }  // END STAGES
+
     post {
         success {
             echo '========================================='
-            echo '✅ Pipeline completed successfully!'
-            echo "🌐 Access your application at: http://${env.EC2_IP}"
+            echo 'PIPELINE COMPLETED SUCCESSFULLY'
+            echo "APP URL: http://${env.EC2_IP}"
             echo '========================================='
         }
         failure {
-            echo '❌ Pipeline failed! Rolling back...'
+            echo '❌ Pipeline failed! Attempting rollback...'
             script {
                 try {
-                    dir('terraform') {
+                    dir('infra/terraform') {
                         withCredentials([[
                             $class: 'AmazonWebServicesCredentialsBinding',
                             credentialsId: 'aws-credentials',
@@ -144,45 +158,16 @@ ${env.EC2_IP} ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/fullstac
                             secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                         ]]) {
                             bat 'terraform destroy -auto-approve'
-                            echo 'Terraform resources destroyed successfully'
                         }
                     }
                 } catch (Exception e) {
-                    echo "⚠️ Rollback encountered an issue: ${e.message}"
-                    echo "Please manually check and destroy resources in AWS console"
+                    echo "Rollback failed: ${e.message}"
                 }
             }
         }
         always {
-            echo 'Cleaning up workspace...'
+            echo 'Cleaning workspace...'
             cleanWs()
         }
     }
 }
-```
-
-## Key Changes Made:
-
-1. **Verify Tools Stage**: Changed to `wsl ansible --version` to check Ansible in Ubuntu/WSL
-
-2. **Prepare SSH Key Stage**: Added a new stage that:
-   - Copies SSH key from Windows to WSL temporary location
-   - Sets proper permissions (chmod 400)
-
-3. **Generate Inventory Stage**: Uses WSL path `/tmp/jenkins-ssh/ec2-key.pem` instead of Windows path
-
-4. **Ansible Deployment Stage**: 
-   - Uses `wsl bash -c` to run Ansible commands in WSL
-   - Converts current Windows directory to WSL path using `wslpath`
-
-5. **Better Error Handling**: Added try-catch in rollback to prevent credential errors from stopping the post actions
-
----
-
-## Prerequisites Before Running:
-
-### 1. Ensure SSH Key is in the Right Location
-
-Make sure your EC2 `.pem` key file is here:
-```
-C:\jenkins-ssh-keys\ec2-key.pem
