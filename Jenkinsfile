@@ -1,58 +1,51 @@
 pipeline {
     agent any
-
-    stages {
-
-        stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Terraform Init') {
-            steps {
-                bat """
-                    cd infra/terraform
-                    terraform init
-                """
-            }
-        }
-
-        stage('Terraform Validate') {
-            steps {
-                bat """
-                    cd infra/terraform
-                    terraform validate
-                """
-            }
-        }
-
-        stage('Terraform Plan') {
-            steps {
-                bat """
-                    cd infra/terraform
-                    terraform plan -out=tfplan
-                """
-            }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                bat """
-                    cd infra/terraform
-                    terraform apply -auto-approve tfplan
-                """
-            }
-        }
-
+    
+    environment {
+        // Method 1: If using AWS Credentials Plugin
+        AWS_DEFAULT_REGION = 'us-east-1'
     }
-
-    post {
-        success {
-            echo "Terraform Pipeline Completed Successfully!"
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/yourusername/your-repo.git',
+                        credentialsId: 'github-token'
+                    ]]
+                ])
+            }
         }
-        failure {
-            echo "Pipeline Failed!"
+        
+        stage('Terraform') {
+            steps {
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-credentials',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]
+                ]) {
+                    dir('terraform') {
+                        bat 'terraform init'
+                        bat 'terraform apply -auto-approve'
+                    }
+                }
+            }
+        }
+        
+        stage('Ansible') {
+            steps {
+                sshagent(['ec2-ssh-key']) {
+                    dir('ansible') {
+                        bat 'ansible-playbook -i inventory.ini playbook.yml'
+                    }
+                }
+            }
         }
     }
 }
