@@ -89,7 +89,15 @@ pipeline {
 
         /* ------------------ ANSIBLE / DEPLOYMENT ------------------ */
 
-        
+        stage('Prepare SSH Key for WSL') {
+            steps {
+                echo 'Preparing SSH key for WSL access...'
+                bat '''
+                    wsl mkdir -p ~/.ssh
+                    wsl cp /mnt/c/jenkins-ssh-keys/fullstack-cicd.pem ~/.ssh/
+                    wsl chmod 400 ~/.ssh/fullstack-cicd.pem
+                '''
+            }
         }
 
         stage('Generate Ansible Inventory') {
@@ -100,7 +108,7 @@ pipeline {
                     def inventory = """[webservers]
 ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/fullstack-cicd.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 """
-                    writeFile file: 'ansible/inventory.ini', text: inventory
+                    writeFile file: 'infra/ansible/inventory.ini', text: inventory
                 }
 
                 echo "Inventory created with IP: ${env.EC2_IP}"
@@ -111,7 +119,7 @@ ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/fullstack-
             steps {
                 echo 'Deploying application to EC2 using Ansible (WSL)...'
 
-                dir('ansible') {
+                dir('infra/ansible') {
                     bat '''
                         wsl bash -c "cd $(wslpath '%CD%') && ansible-playbook -i inventory.ini playbook.yml"
                     '''
@@ -158,7 +166,5 @@ ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/fullstack-
             echo 'Cleaning workspace...'
             cleanWs()
         }
-    
+    }
 }
-
-
