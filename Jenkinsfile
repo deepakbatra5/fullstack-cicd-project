@@ -1,81 +1,51 @@
 pipeline {
     agent any
-
+    
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-        AWS_DEFAULT_REGION    = 'ap-south-1'   // change if needed
+        // Method 1: If using AWS Credentials Plugin
+        AWS_DEFAULT_REGION = 'us-east-1'
     }
-
+    
     stages {
-
         stage('Checkout') {
             steps {
-                checkout scm
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/yourusername/your-repo.git',
+                        credentialsId: 'github-token'
+                    ]]
+                ])
             }
         }
-
-        stage('Terraform Init') {
+        
+        stage('Terraform') {
             steps {
-                dir('terraform') {
-                    bat "terraform init"
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-credentials',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]
+                ]) {
+                    dir('terraform') {
+                        bat 'terraform init'
+                        bat 'terraform apply -auto-approve'
+                    }
                 }
             }
         }
-
-        stage('Terraform Plan') {
+        
+        stage('Ansible') {
             steps {
-                dir('terraform') {
-                    bat "terraform plan -out=tfplan"
+                sshagent(['ec2-ssh-key']) {
+                    dir('ansible') {
+                        bat 'ansible-playbook -i inventory.ini playbook.yml'
+                    }
                 }
             }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                dir('terraform') {
-                    bat "terraform apply -auto-approve tfplan"
-                }
-            }
-        }
-
-        stage('Read EC2 IP from Terraform') {
-            steps {
-                script {
-                    def output = bat(
-                        script: "cd terraform && terraform output -raw ec2_public_ip",
-                        returnStdout: true
-                    ).trim()
-
-                    echo "EC2 Public IP: ${output}"
-                    env.EC2_IP = output
-                }
-            }
-        }
-
-        stage('Run Ansible (via WSL)') {
-            steps {
-                script {
-                    // WSL command runs ansible-playbook inside Ubuntu
-                    // Note the dynamic inventory: "<ip>,"
-                    def cmd = """
-wsl ansible-playbook -i ${env.EC2_IP}, -u ubuntu \\
-  --private-key ~/.ssh/jenkins-key.pem \\
-  ansible/deploy.yml
-"""
-                    bat cmd
-                }
-            }
-        }
-    }
-
-    post {
-        success {
-            echo "✅ Full CI/CD finished: Terraform created infra, Ansible configured EC2, app deployed."
-        }
-        failure {
-            echo "❌ Pipeline failed. Check Terraform or Ansible logs in Jenkins console."
         }
     }
 }
-                                                 
