@@ -158,6 +158,7 @@ ${env.EC2_IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/fullstack-
             echo 'Cleaning workspace...'
             cleanWs()
         }
-    }
+    
 }
+
 
