@@ -19,6 +19,9 @@
     - name: Clone or update repository
       git:
         repo: "{{ repo_url }}"
+        dest: "{{ app_path }}"
+        version: main
+        force: yes
       
 
     - name: Build and start services using docker compose
