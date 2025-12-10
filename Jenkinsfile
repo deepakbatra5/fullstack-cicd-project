@@ -8,28 +8,31 @@ pipeline {
             }
         }
 
-       withCredentials([[
-    $class: 'AmazonWebServicesCredentialsBinding',
-    credentialsId: 'aws-credentials'
-]]) {
-    dir('infra/terraform') {
+        stage('Terraform Init/Plan/Apply') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-credentials'
+                ]]) {
 
-        bat 'terraform init'
-        
-        bat '''
-            terraform plan ^
-            -var "ami_id=ami-03deb8c961063af8c" ^
-            -var "key_name=fullstack-cicd"
-        '''
+                    dir('infra/terraform') {
 
-        bat '''
-            terraform apply -auto-approve ^
-            -var "ami_id=ami-03deb8c961063af8c" ^
-            -var "key_name=fullstack-cicd"
-        '''
+                        bat 'terraform init'
+
+                        bat '''
+                            terraform plan ^
+                            -var "ami_id=ami-03deb8c961063af8c" ^
+                            -var "key_name=fullstack-cicd"
+                        '''
+
+                        bat '''
+                            terraform apply -auto-approve ^
+                            -var "ami_id=ami-03deb8c961063af8c" ^
+                            -var "key_name=fullstack-cicd"
+                        '''
+                    }
+                }
+            }
+        }
     }
 }
-
-    }
-}
-
