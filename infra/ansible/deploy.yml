@@ -7,62 +7,21 @@
 
   tasks:
 
-    # --------------------------------------------------------------
-    # REMOVE OLD DOCKER + COMPOSE
-    # --------------------------------------------------------------
-    - name: Remove old Docker versions
+    - name: Update apt packages
       apt:
-        name:
-          - docker
-          - docker-engine
-          - docker.io
-          - containerd
-          - runc
-          - docker-compose
-        state: absent
-        purge: yes
-        autoremove: yes
-
-    # --------------------------------------------------------------
-    # INSTALL LATEST DOCKER ENGINE (OFFICIAL DOCKER REPO)
-    # --------------------------------------------------------------
-    - name: Install required packages
-      apt:
-        name:
-          - ca-certificates
-          - curl
-          - gnupg
         update_cache: yes
 
-    - name: Add Docker GPG key
-      shell: |
-        install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.gpg
-        chmod a+r /etc/apt/keyrings/docker.gpg
+    # ---------------------------------------------------------
+    # Install Latest Docker + Compose v2 (Official Script)
+    # ---------------------------------------------------------
+    - name: Download Docker install script
+      get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
 
-    - name: Add Docker repository
-      shell: |
-        echo \
-        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-        https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-        | tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-    - name: Install latest Docker Engine + CLI + containerd
-      apt:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-buildx-plugin
-          - docker-compose-plugin
-        update_cache: yes
-        state: present
-
-    - name: Ensure Docker service is running
-      service:
-        name: docker
-        state: started
-        enabled: yes
+    - name: Run Docker install script
+      shell: sh /tmp/get-docker.sh
 
     - name: Add ubuntu user to docker group
       user:
@@ -70,9 +29,9 @@
         groups: docker
         append: yes
 
-    # --------------------------------------------------------------
-    # CLONE / PULL LATEST PROJECT
-    # --------------------------------------------------------------
+    # ---------------------------------------------------------
+    # Clone Project
+    # ---------------------------------------------------------
     - name: Create app directory if missing
       file:
         path: "{{ app_path }}"
@@ -85,10 +44,10 @@
         version: main
         force: yes
 
-    # --------------------------------------------------------------
-    # RUN USING "docker compose"
-    # --------------------------------------------------------------
-    - name: Stop containers if running
+    # ---------------------------------------------------------
+    # Run docker compose
+    # ---------------------------------------------------------
+    - name: Stop existing docker containers
       shell: docker compose down
       args:
         chdir: "{{ app_path }}"
