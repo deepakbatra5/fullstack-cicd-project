@@ -4,9 +4,6 @@
   vars:
     repo_url: "https://github.com/deepakbatra5/fullstack-cicd-project.git"
     app_path: "/home/ubuntu/FULLSTACK-CICD-PROJECT"
-    container_name: "myapp"
-    image_name: "myapp-image"
-    exposed_port: "4000"
 
   tasks:
 
@@ -14,11 +11,12 @@
       apt:
         update_cache: yes
 
-    - name: Install required packages for Git & Docker
+    - name: Install required packages for Git & Docker & Compose
       apt:
         name:
           - git
           - docker.io
+          - docker-compose
         state: present
 
     - name: Ensure Docker service is running
@@ -28,64 +26,34 @@
         enabled: yes
 
     # --------------------------------------------------------------------
-    #   CLONE / PULL LATEST CODE FROM GITHUB
+    #   CLONE / UPDATE CODE
     # --------------------------------------------------------------------
 
-    - name: Create app directory if missing
+    - name: Create app directory
       file:
         path: "{{ app_path }}"
         state: directory
 
-    - name: Clone repo if not present
+    - name: Clone or pull latest code
       git:
         repo: "{{ repo_url }}"
         dest: "{{ app_path }}"
         version: main
         force: yes
 
-    - name: Pull latest code
-      git:
-        repo: "{{ repo_url }}"
-        dest: "{{ app_path }}"
-        update: yes
-        version: main
-
     # --------------------------------------------------------------------
-    #   BUILD DOCKER IMAGE
+    #   RUN DOCKER COMPOSE (APP + DB)
     # --------------------------------------------------------------------
 
-    - name: Build Docker image from Dockerfile
-      community.docker.docker_image:
-        name: "{{ image_name }}"
-        build:
-          path: "/home/ubuntu/FULLSTACK-CICD-PROJECT/app"
-        source: build
+    - name: Stop existing docker containers
+      shell: docker compose down
+      args:
+        chdir: "{{ app_path }}"
 
-    # --------------------------------------------------------------------
-    #   STOP AND REMOVE OLD CONTAINER IF EXISTS
-    # --------------------------------------------------------------------
+    - name: Build and start services using docker compose
+      shell: docker compose up -d --build
+      args:
+        chdir: "{{ app_path }}"
 
-    - name: Stop old container if running
-      community.docker.docker_container:
-        name: "{{ container_name }}"
-        state: stopped
-      ignore_errors: yes
-
-    - name: Remove old container
-      community.docker.docker_container:
-        name: "{{ container_name }}"
-        state: absent
-      ignore_errors: yes
-
-    # --------------------------------------------------------------------
-    #   RUN DOCKER CONTAINER
-    # --------------------------------------------------------------------
-
-    - name: Run Docker container
-      community.docker.docker_container:
-        name: "{{ container_name }}"
-        image: "{{ image_name }}"
-        state: started
-        restart_policy: always
-        published_ports:
-          - "{{ exposed_port }}:{{ exposed_port }}"
+    - name: Show running containers
+      shell: docker ps
