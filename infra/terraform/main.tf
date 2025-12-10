@@ -22,7 +22,7 @@ provider "aws" {
 }
 
 resource "aws_security_group" "app_sg" {
-  name        = "app-sg"
+  name_prefix        = "app-sg"
   description = "Allow SSH and HTTP"
 
   ingress {
