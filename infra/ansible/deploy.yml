@@ -7,55 +7,6 @@
 
   tasks:
 
-    # ---------------------------------------------------------
-    # FIX APT ERROR: REMOVE BAD DOCKER REPO FIRST
-    # ---------------------------------------------------------
-    - name: Remove old Docker repository list if exists
-      file:
-        path: /etc/apt/sources.list.d/docker.list
-        state: absent
-
-    - name: Update apt packages
-      apt:
-        update_cache: yes
-
-    # ---------------------------------------------------------
-    # INSTALL DOCKER ENGINE + COMPOSE v2
-    # ---------------------------------------------------------
-    - name: Download Docker install script
-      get_url:
-        url: https://get.docker.com
-        dest: /tmp/get-docker.sh
-        mode: '0755'
-
-    - name: Run Docker install script
-      shell: sh /tmp/get-docker.sh
-
-    - name: Ensure Docker service is started
-      service:
-        name: docker
-        state: started
-        enabled: yes
-
-    - name: Add ubuntu user to docker group
-      user:
-        name: ubuntu
-        groups: docker
-        append: yes
-
-    # ---------------------------------------------------------
-    # WAIT FOR DOCKER DAEMON
-    # ---------------------------------------------------------
-    - name: Wait until Docker daemon is available
-      shell: |
-        until docker info >/dev/null 2>&1; do
-          echo "Waiting for Docker..."
-          sleep 3
-        done
-      retries: 10
-      delay: 3
-      register: docker_ready
-      until: docker_ready.rc == 0
 
     # ---------------------------------------------------------
     # CLONE / UPDATE PROJECT
@@ -68,23 +19,11 @@
     - name: Clone or update repository
       git:
         repo: "{{ repo_url }}"
-        dest: "{{ app_path }}"
-        version: main
-        force: yes
-
-    # ---------------------------------------------------------
-    # RUN DOCKER COMPOSE
-    # ---------------------------------------------------------
-    - name: Stop existing docker containers
-      shell: docker compose down
-      args:
-        chdir: "{{ app_path }}"
-      ignore_errors: yes
+      
 
     - name: Build and start services using docker compose
       shell: docker compose up -d --build
       args:
         chdir: "{{ app_path }}"
 
-    - name: Show running containers
-      shell: docker ps
+   
