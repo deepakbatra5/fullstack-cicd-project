@@ -1,32 +1,59 @@
-version: '3.8'
+---
+- hosts: appserver
+  become: yes
+  vars:
+    repo_url: "https://github.com/deepakbatra5/fullstack-cicd-project.git"
+    app_path: "/home/ubuntu/FULLSTACK-CICD-PROJECT"
 
-services:
-  db:
-    image: postgres:16-alpine
-    container_name: visits-db
-    environment:
-      POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: apppassword
-      POSTGRES_DB: appdb
-    ports:
-      - "5432:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
+  tasks:
 
-  app:
-    build: ./app
-    container_name: visits-app
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: appuser
-      DB_PASSWORD: apppassword
-      DB_NAME: appdb
-      PORT: 4000
-    depends_on:
-      - db
-    ports:
-      - "4000:4000"
+    - name: Update apt packages
+      apt:
+        update_cache: yes
 
-volumes:
-  db_data:
+    - name: Install required packages for Git & Docker & Compose
+      apt:
+        name:
+          - git
+          - docker.io
+          - docker-compose
+        state: present
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    # --------------------------------------------------------------------
+    #   CLONE / UPDATE CODE
+    # --------------------------------------------------------------------
+
+    - name: Create app directory
+      file:
+        path: "{{ app_path }}"
+        state: directory
+
+    - name: Clone or pull latest code
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_path }}"
+        version: main
+        force: yes
+
+    # --------------------------------------------------------------------
+    #   RUN DOCKER COMPOSE (APP + DB)
+    # --------------------------------------------------------------------
+
+    - name: Stop existing docker containers
+      shell: docker compose down
+      args:
+        chdir: "{{ app_path }}"
+
+    - name: Build and start services using docker compose
+      shell: docker compose up -d --build
+      args:
+        chdir: "{{ app_path }}"
+
+    - name: Show running containers
+      shell: docker ps
