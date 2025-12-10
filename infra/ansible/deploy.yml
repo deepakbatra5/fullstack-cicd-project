@@ -58,7 +58,7 @@
       community.docker.docker_image:
         name: "{{ image_name }}"
         build:
-          path: "{{/home/ubuntu/FULLSTACK-CICD-PROJECT/app}}"
+          path: "/home/ubuntu/FULLSTACK-CICD-PROJECT/app"
         source: build
 
     # --------------------------------------------------------------------
