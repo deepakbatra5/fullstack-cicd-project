@@ -48,7 +48,6 @@ crash.log
 .terraform.lock.hcl
 
 # Sensitive files
-*.tfvars
 *.tfvars.json
 
 # Backup and override files

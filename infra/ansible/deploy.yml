@@ -1,55 +1,91 @@
 ---
-- name: Install Prometheus & Grafana on EC2
-  hosts: appserver
+- hosts: appserver
   become: yes
+  vars:
+    repo_url: "https://github.com/deepakbatra5/fullstack-cicd-project.git"
+    app_path: "/home/ubuntu/FULLSTACK-CICD-PROJECT"
+    container_name: "myapp"
+    image_name: "myapp-image"
+    exposed_port: "4000"
 
   tasks:
 
-    - name: Update APT
+    - name: Update apt packages
       apt:
         update_cache: yes
 
-    # -----------------------
-    # Install Prometheus
-    # -----------------------
-    - name: Install Prometheus
+    - name: Install required packages for Git & Docker
       apt:
-        name: prometheus
+        name:
+          - git
+          - docker.io
         state: present
 
-    - name: Enable & Start Prometheus
-      systemd:
-        name: prometheus
-        enabled: yes
+    - name: Ensure Docker service is running
+      service:
+        name: docker
         state: started
-
-    # -----------------------
-    # Install Grafana
-    # -----------------------
-    - name: Install dependencies
-      apt:
-        name: apt-transport-https
-        state: present
-
-    - name: Add Grafana GPG key
-      apt_key:
-        url: https://packages.grafana.com/gpg.key
-        state: present
-
-    - name: Add Grafana APT repository
-      apt_repository:
-        repo: "deb https://packages.grafana.com/oss/deb stable main"
-        state: present
-
-    - name: Install Grafana
-      apt:
-        name: grafana
-        state: present
-        update_cache: yes
-
-    - name: Enable & Start Grafana
-      systemd:
-        name: grafana-server
         enabled: yes
-        state: started
 
+    # --------------------------------------------------------------------
+    #   CLONE / PULL LATEST CODE FROM GITHUB
+    # --------------------------------------------------------------------
+
+    - name: Create app directory if missing
+      file:
+        path: "{{ app_path }}"
+        state: directory
+
+    - name: Clone repo if not present
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_path }}"
+        version: main
+        force: yes
+
+    - name: Pull latest code
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_path }}"
+        update: yes
+        version: main
+
+    # --------------------------------------------------------------------
+    #   BUILD DOCKER IMAGE
+    # --------------------------------------------------------------------
+
+    - name: Build Docker image from Dockerfile
+      community.docker.docker_image:
+        name: "{{ image_name }}"
+        build:
+          path: "{{ app_path }}"
+        source: build
+
+    # --------------------------------------------------------------------
+    #   STOP AND REMOVE OLD CONTAINER IF EXISTS
+    # --------------------------------------------------------------------
+
+    - name: Stop old container if running
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: stopped
+      ignore_errors: yes
+
+    - name: Remove old container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: absent
+      ignore_errors: yes
+
+    # --------------------------------------------------------------------
+    #   RUN DOCKER CONTAINER
+    # --------------------------------------------------------------------
+
+    - name: Run Docker container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ image_name }}"
+        state: started
+        restart_policy: always
+        published_ports:
+          - "{{ exposed_port }}:{{ exposed_port }}"
