@@ -1,4 +1,3 @@
----
 - hosts: appserver
   become: yes
   vars:
@@ -7,10 +6,25 @@
 
   tasks:
 
+    # ---------------------------------------------------------
+    # INSTALL DOCKER IF NOT INSTALLED
+    # ---------------------------------------------------------
+
+    - name: Check if Docker is installed
+      command: which docker
+      register: docker_exists
+      ignore_errors: yes
+
+    - name: Install Docker using official script
+      shell: curl -fsSL https://get.docker.com | sh
+      when: docker_exists.rc != 0
+
+    
 
     # ---------------------------------------------------------
     # CLONE / UPDATE PROJECT
     # ---------------------------------------------------------
+
     - name: Create app directory if missing
       file:
         path: "{{ app_path }}"
@@ -22,11 +36,12 @@
         dest: "{{ app_path }}"
         version: main
         force: yes
-      
+
+    # ---------------------------------------------------------
+    # BUILD & RUN DOCKER COMPOSE
+    # ---------------------------------------------------------
 
     - name: Build and start services using docker compose
       shell: docker compose up -d --build
       args:
         chdir: "{{ app_path }}"
-
-   
