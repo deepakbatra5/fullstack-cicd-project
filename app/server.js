@@ -23,7 +23,7 @@ app.get('/api/visits', async (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.send('OK');
+  res.send('OK good');
 });
 
 (async () => {
@@ -34,6 +34,6 @@ app.get('/health', (req, res) => {
     });
   } catch (err) {
     console.error('Failed to init DB', err);
-    process.exit(1);
+    process.exit(1); 
   }
 })();
