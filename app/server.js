@@ -23,7 +23,7 @@ app.get('/api/visits', async (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.send('OK vening');
+  res.send('OK evening friend');
 });
 
 (async () => {
