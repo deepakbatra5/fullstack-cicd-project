@@ -70,13 +70,13 @@ pipeline {
                             echo Running Ansible via WSL...
 
                             REM Create SSH directory inside WSL
-                            wsl mkdir -p ~/.ssh
+                            // wsl mkdir -p ~/.ssh
 
-                            REM Convert Windows path → WSL path & copy PEM key
-                            wsl cp "`wslpath "%SSH_KEY%"`" ~/.ssh/fullstack-cicd.pem
+                            // REM Convert Windows path → WSL path & copy PEM key
+                            // wsl cp "`wslpath "%SSH_KEY%"`" ~/.ssh/fullstack-cicd.pem
 
-                            REM Fix permissions
-                            wsl chmod 600 ~/.ssh/ec2.pem
+                            // REM Fix permissions
+                            // wsl chmod 600 ~/.ssh/fullstake-cicd.pem
 
                             REM Run Ansible playbook
                             wsl ansible-playbook -i inventory.ini deploy.yml --private-key ~/.ssh/fullstack-cicd.pem
@@ -86,4 +86,5 @@ pipeline {
             }
         }
     }
+
 }
