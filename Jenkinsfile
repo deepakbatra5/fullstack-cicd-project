@@ -82,7 +82,10 @@ pipeline {
                             wsl chmod 600 ~/.ssh/fullstake-cicd.pem
 
                             REM Run Ansible playbook
-                            wsl ansible-playbook -i inventory.ini deploy.yml --private-key ~/.ssh/fullstack-cicd.pem
+                           wsl ansible-playbook -i inventory.ini deploy.yml ^
+                           --private-key ~/.ssh/fullstack-cicd.pem ^
+                           --ssh-common-args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
                         """
                     }
                 }
@@ -91,4 +94,5 @@ pipeline {
     }
 
 }
+
 
